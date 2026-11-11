@@ -27,15 +27,24 @@ jobs:
           ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0"
 
       - name: Setup Signing Keystore
-        if: ${{ secrets.KEYSTORE != '' }}
+        # secrets 上下文在 if 表达式中不可用，改用 env 判断：有密钥则落盘并注入签名变量，
+        # 没有密钥时跳过落盘，后续构建产出 unsigned APK。
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
-          echo "KEYSTORE_FILE=$(pwd)/release.keystore" >> $GITHUB_ENV
-          echo "KEYSTORE_PASSWORD=${{ secrets.SIGNING_STORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_ALIAS=${{ secrets.SIGNING_KEY_ALIAS }}" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}" >> $GITHUB_ENV
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+            echo "KEYSTORE_FILE=$(pwd)/release.keystore" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=$STORE_PASSWORD" >> $GITHUB_ENV
+            echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+            echo "签名密钥已写入 release.keystore"
+          else
+            echo "未配置 KEYSTORE secret，本次构建产出 unsigned APK"
+          fi
 
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon
