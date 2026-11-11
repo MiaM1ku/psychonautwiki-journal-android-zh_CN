@@ -56,7 +56,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            // 仅在提供 keystore 时启用签名；缺少密钥时产出 unsigned APK，便于本地与 CI 无密构建
+            signingConfigs.getByName("release").takeIf { it.storeFile != null }?.let {
+                signingConfig = it
+            }
             ndk.debugSymbolLevel = "FULL"
         }
     }
